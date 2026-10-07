@@ -6,10 +6,24 @@ def fetch_gfg_profile(username: str) -> dict:
     """
     Fetches real-time GeeksforGeeks profile data by parsing public user profile.
     Retrieves coding score, problems solved, institute rank, and streak.
+    Returns:
+        {
+            "username": str,
+            "platform": "GFG",
+            "available": bool,
+            "stats": dict or None,
+            "error": str or None
+        }
     """
-    username = username.strip()
+    username = (username or "").strip()
     if not username:
-        return {"platform": "GFG", "error": "Username cannot be empty"}
+        return {
+            "username": "",
+            "platform": "GFG",
+            "available": False,
+            "stats": None,
+            "error": "Username cannot be empty"
+        }
 
     url = f"https://www.geeksforgeeks.org/user/{username}/"
     headers = {
@@ -20,15 +34,19 @@ def fetch_gfg_profile(username: str) -> dict:
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 404:
             return {
-                "platform": "GFG",
                 "username": username,
-                "error": f"GFG user '{username}' not found"
+                "platform": "GFG",
+                "available": False,
+                "stats": None,
+                "error": f"GeeksforGeeks user '{username}' not found"
             }
         elif response.status_code != 200:
             return {
-                "platform": "GFG",
                 "username": username,
-                "error": f"GFG returned status code {response.status_code}"
+                "platform": "GFG",
+                "available": False,
+                "stats": None,
+                "error": f"GeeksforGeeks profile unavailable (status {response.status_code})"
             }
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -75,21 +93,39 @@ def fetch_gfg_profile(username: str) -> dict:
         img_elem = soup.find("img", class_=re.compile(r"profile|avatar|userImage", re.I))
         avatar = img_elem.get("src", "") if img_elem else ""
 
+        # If we couldn't find any coding stats or user page is empty, mark unavailable
+        if coding_score == 0 and problems_solved == 0 and institute_rank == "N/A":
+            # Check if this is a valid user page
+            user_handle_elem = soup.find(string=re.compile(username, re.I))
+            if not user_handle_elem:
+                return {
+                    "username": username,
+                    "platform": "GFG",
+                    "available": False,
+                    "stats": None,
+                    "error": f"GeeksforGeeks user '{username}' profile data unavailable"
+                }
+
         return {
-            "platform": "GFG",
             "username": username,
-            "name": username,
-            "rating": coding_score,
-            "solved": problems_solved,
-            "rank": institute_rank,
-            "avatar": avatar,
-            "profile_url": url,
+            "platform": "GFG",
+            "available": True,
+            "stats": {
+                "name": username,
+                "rating": coding_score,
+                "solved": problems_solved,
+                "rank": institute_rank,
+                "avatar": avatar,
+                "profile_url": url,
+            },
             "error": None
         }
 
     except requests.RequestException as e:
         return {
-            "platform": "GFG",
             "username": username,
-            "error": f"Network error fetching GFG profile: {str(e)}"
+            "platform": "GFG",
+            "available": False,
+            "stats": None,
+            "error": f"Network error connecting to GeeksforGeeks: {str(e)}"
         }

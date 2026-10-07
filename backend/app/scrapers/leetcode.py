@@ -1,5 +1,4 @@
 import requests
-import json
 
 LEETCODE_GRAPHQL_URL = "https://leetcode.com/graphql"
 
@@ -37,10 +36,24 @@ def fetch_leetcode_profile(username: str) -> dict:
     """
     Fetches real-time LeetCode profile data using LeetCode's public GraphQL endpoint.
     Retrieves exact problems solved (Easy/Medium/Hard), contest rating, and global ranking.
+    Returns:
+        {
+            "username": str,
+            "platform": "LeetCode",
+            "available": bool,
+            "stats": dict or None,
+            "error": str or None
+        }
     """
-    username = username.strip()
+    username = (username or "").strip()
     if not username:
-        return {"platform": "LeetCode", "error": "Username cannot be empty"}
+        return {
+            "username": "",
+            "platform": "LeetCode",
+            "available": False,
+            "stats": None,
+            "error": "Username cannot be empty"
+        }
 
     headers = {
         "Content-Type": "application/json",
@@ -57,9 +70,11 @@ def fetch_leetcode_profile(username: str) -> dict:
         response = requests.post(LEETCODE_GRAPHQL_URL, json=payload, headers=headers, timeout=10)
         if response.status_code != 200:
             return {
-                "platform": "LeetCode",
                 "username": username,
-                "error": f"LeetCode returned status code {response.status_code}"
+                "platform": "LeetCode",
+                "available": False,
+                "stats": None,
+                "error": f"LeetCode service unavailable (status {response.status_code})"
             }
 
         data = response.json().get("data", {})
@@ -67,8 +82,10 @@ def fetch_leetcode_profile(username: str) -> dict:
 
         if not matched_user:
             return {
-                "platform": "LeetCode",
                 "username": username,
+                "platform": "LeetCode",
+                "available": False,
+                "stats": None,
                 "error": f"LeetCode user '{username}' not found"
             }
 
@@ -89,25 +106,30 @@ def fetch_leetcode_profile(username: str) -> dict:
         top_percentage = contest_ranking.get("topPercentage")
 
         return {
-            "platform": "LeetCode",
             "username": username,
-            "name": profile.get("realName") or username,
-            "avatar": profile.get("userAvatar") or "",
-            "global_rank": profile.get("ranking"),
-            "solved": solved_counts["All"],
-            "solved_easy": solved_counts["Easy"],
-            "solved_medium": solved_counts["Medium"],
-            "solved_hard": solved_counts["Hard"],
-            "rating": contest_rating,
-            "contest_rank": global_contest_rank,
-            "top_percentage": f"{top_percentage:.1f}%" if top_percentage is not None else None,
-            "profile_url": f"https://leetcode.com/{username}/",
+            "platform": "LeetCode",
+            "available": True,
+            "stats": {
+                "name": profile.get("realName") or username,
+                "avatar": profile.get("userAvatar") or "",
+                "global_rank": profile.get("ranking"),
+                "solved": solved_counts["All"],
+                "solved_easy": solved_counts["Easy"],
+                "solved_medium": solved_counts["Medium"],
+                "solved_hard": solved_counts["Hard"],
+                "rating": contest_rating,
+                "contest_rank": global_contest_rank,
+                "top_percentage": f"{top_percentage:.1f}%" if top_percentage is not None else None,
+                "profile_url": f"https://leetcode.com/{username}/",
+            },
             "error": None
         }
 
     except requests.RequestException as e:
         return {
-            "platform": "LeetCode",
             "username": username,
-            "error": f"Network error fetching LeetCode profile: {str(e)}"
+            "platform": "LeetCode",
+            "available": False,
+            "stats": None,
+            "error": f"Network error connecting to LeetCode: {str(e)}"
         }

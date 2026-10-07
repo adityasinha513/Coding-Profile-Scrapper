@@ -22,10 +22,24 @@ def fetch_codechef_profile(username: str) -> dict:
     """
     Fetches real-time CodeChef profile data by parsing public user page.
     Retrieves rating, division/stars, global & country ranks, and problems solved.
+    Returns:
+        {
+            "username": str,
+            "platform": "CodeChef",
+            "available": bool,
+            "stats": dict or None,
+            "error": str or None
+        }
     """
-    username = username.strip()
+    username = (username or "").strip()
     if not username:
-        return {"platform": "CodeChef", "error": "Username cannot be empty"}
+        return {
+            "username": "",
+            "platform": "CodeChef",
+            "available": False,
+            "stats": None,
+            "error": "Username cannot be empty"
+        }
 
     url = f"https://www.codechef.com/users/{username}"
     headers = {
@@ -36,22 +50,36 @@ def fetch_codechef_profile(username: str) -> dict:
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 404:
             return {
-                "platform": "CodeChef",
                 "username": username,
+                "platform": "CodeChef",
+                "available": False,
+                "stats": None,
                 "error": f"CodeChef user '{username}' not found"
             }
         elif response.status_code != 200:
             return {
-                "platform": "CodeChef",
                 "username": username,
-                "error": f"CodeChef returned status code {response.status_code}"
+                "platform": "CodeChef",
+                "available": False,
+                "stats": None,
+                "error": f"CodeChef profile unavailable (status {response.status_code})"
             }
 
         soup = BeautifulSoup(response.text, "html.parser")
 
         # Name
         name_elem = soup.find("h1", class_="h2-style")
-        name = name_elem.text.strip() if name_elem else username
+        if not name_elem:
+            # If standard profile structure isn't present, treat as unavailable
+            return {
+                "username": username,
+                "platform": "CodeChef",
+                "available": False,
+                "stats": None,
+                "error": f"Could not parse CodeChef profile for '{username}'"
+            }
+
+        name = name_elem.text.strip() or username
 
         # Rating
         rating_elem = soup.find("div", class_="rating-number")
@@ -101,22 +129,27 @@ def fetch_codechef_profile(username: str) -> dict:
         avatar = img_elem.get("src", "") if img_elem else ""
 
         return {
-            "platform": "CodeChef",
             "username": username,
-            "name": name,
-            "rating": rating_val,
-            "stars": stars,
-            "global_rank": global_rank,
-            "country_rank": country_rank,
-            "solved": solved_count,
-            "avatar": avatar,
-            "profile_url": url,
+            "platform": "CodeChef",
+            "available": True,
+            "stats": {
+                "name": name,
+                "rating": rating_val,
+                "stars": stars,
+                "global_rank": global_rank,
+                "country_rank": country_rank,
+                "solved": solved_count,
+                "avatar": avatar,
+                "profile_url": url,
+            },
             "error": None
         }
 
     except requests.RequestException as e:
         return {
-            "platform": "CodeChef",
             "username": username,
-            "error": f"Network error fetching CodeChef profile: {str(e)}"
+            "platform": "CodeChef",
+            "available": False,
+            "stats": None,
+            "error": f"Network error connecting to CodeChef: {str(e)}"
         }

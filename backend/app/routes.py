@@ -20,11 +20,17 @@ PLATFORM_FETCHERS = {
     'gfg': fetch_gfg_profile,
 }
 
-def fetch_single_profile(platform: str, handle: str, force_refresh: bool = False):
+def fetch_single_profile(platform: str, handle: str, force_refresh: bool = False) -> dict:
     platform_key = platform.lower()
     fetcher = PLATFORM_FETCHERS.get(platform_key)
     if not fetcher or not handle:
-        return None
+        return {
+            'username': handle or '',
+            'platform': platform,
+            'available': False,
+            'stats': None,
+            'error': f'Unsupported platform {platform}' if not fetcher else 'Handle is empty'
+        }
 
     cache_key = f"profile:{platform_key}:{handle.strip().lower()}"
     if not force_refresh:
@@ -33,8 +39,8 @@ def fetch_single_profile(platform: str, handle: str, force_refresh: bool = False
             return cached
 
     result = fetcher(handle.strip())
-    if result and not result.get("error"):
-        cache.set(cache_key, result, ttl=600)  # cache 10 minutes
+    if result and result.get('available'):
+        cache.set(cache_key, result, ttl=600)  # 10 minutes cache
     return result
 
 def aggregate_profiles(handles: dict, force_refresh: bool = False) -> list:
@@ -46,11 +52,18 @@ def aggregate_profiles(handles: dict, force_refresh: bool = False) -> list:
                 profiles.append(data)
     return profiles
 
+def extract_metric(profile_data: dict, key: str, default=0):
+    """Safely extracts a metric from the stats dictionary."""
+    if not profile_data or not profile_data.get('available'):
+        return default
+    stats = profile_data.get('stats') or {}
+    return stats.get(key, default)
+
 # ----------------- Health -----------------
 @api.route('/health', methods=['GET'])
 def health_check():
     return jsonify({
-        'status': 'healthy',
+        'status': 'UP',
         'service': 'Coding Profile Scrapper API',
         'version': '1.0.0'
     })
@@ -127,8 +140,16 @@ def get_user_profiles():
     profiles = aggregate_profiles(handles, force_refresh=force_refresh)
 
     # Compute summary stats
-    total_solved = sum(p.get('solved', 0) for p in profiles if isinstance(p.get('solved'), int))
-    ratings = [p.get('rating') for p in profiles if isinstance(p.get('rating'), (int, float)) and p.get('rating')]
+    total_solved = sum(
+        extract_metric(p, 'solved', 0)
+        for p in profiles
+        if p.get('platform') in ['LeetCode', 'CodeChef', 'GFG']
+    )
+    ratings = [
+        extract_metric(p, 'rating')
+        for p in profiles
+        if isinstance(extract_metric(p, 'rating'), (int, float)) and extract_metric(p, 'rating') > 0
+    ]
     best_rating = max(ratings) if ratings else 0
 
     return jsonify({
@@ -148,10 +169,14 @@ def update_handles():
 
     for platform in ['leetcode', 'github', 'codeforces', 'codechef', 'gfg']:
         if platform in data:
-            val = (data[platform] or '').strip()
-            setattr(user, f"{platform}_handle", val)
-            # Invalidate cache for that platform
-            cache.delete(f"profile:{platform}:{val.lower()}")
+            old_val = getattr(user, f"{platform}_handle") or ""
+            new_val = (data[platform] or '').strip()
+            setattr(user, f"{platform}_handle", new_val)
+            # Invalidate old and new cache keys
+            if old_val:
+                cache.delete(f"profile:{platform}:{old_val.lower()}")
+            if new_val:
+                cache.delete(f"profile:{platform}:{new_val.lower()}")
 
     if 'name' in data and data['name']:
         user.name = data['name'].strip()
@@ -165,10 +190,8 @@ def update_handles():
 @api.route('/profiles/scrape/<platform>/<handle>', methods=['GET'])
 def scrape_preview(platform, handle):
     data = fetch_single_profile(platform, handle, force_refresh=True)
-    if not data:
-        return jsonify({'error': f'Unsupported platform {platform}'}), 400
-    if data.get('error'):
-        return jsonify(data), 404
+    if not data or not data.get('available'):
+        return jsonify(data or {'error': 'Profile unavailable', 'available': False}), 404
     return jsonify(data)
 
 # ----------------- Friends -----------------
@@ -181,8 +204,16 @@ def get_friends():
     for f in friends:
         friend_data = f.to_dict()
         friend_data['profiles'] = aggregate_profiles(f.get_handles(), force_refresh=False)
-        total_solved = sum(p.get('solved', 0) for p in friend_data['profiles'] if isinstance(p.get('solved'), int))
-        ratings = [p.get('rating') for p in friend_data['profiles'] if isinstance(p.get('rating'), (int, float)) and p.get('rating')]
+        total_solved = sum(
+            extract_metric(p, 'solved', 0)
+            for p in friend_data['profiles']
+            if p.get('platform') in ['LeetCode', 'CodeChef', 'GFG']
+        )
+        ratings = [
+            extract_metric(p, 'rating')
+            for p in friend_data['profiles']
+            if isinstance(extract_metric(p, 'rating'), (int, float)) and extract_metric(p, 'rating') > 0
+        ]
         friend_data['summary'] = {
             'total_solved': total_solved,
             'best_rating': max(ratings) if ratings else 0
@@ -243,8 +274,20 @@ def get_leaderboard():
     # Current User
     user_handles = g.current_user.get_handles()
     user_profiles = aggregate_profiles(user_handles, force_refresh=False)
-    user_solved = sum(p.get('solved', 0) for p in user_profiles if isinstance(p.get('solved'), int))
-    user_ratings = [p.get('rating') for p in user_profiles if isinstance(p.get('rating'), (int, float)) and p.get('rating')]
+    user_solved = sum(
+        extract_metric(p, 'solved', 0)
+        for p in user_profiles
+        if p.get('platform') in ['LeetCode', 'CodeChef', 'GFG']
+    )
+    user_ratings = [
+        extract_metric(p, 'rating')
+        for p in user_profiles
+        if isinstance(extract_metric(p, 'rating'), (int, float)) and extract_metric(p, 'rating') > 0
+    ]
+
+    def get_stat(profiles_list, platform_name, stat_name):
+        p = next((p for p in profiles_list if p.get('platform') == platform_name), None)
+        return extract_metric(p, stat_name, 0)
 
     entries.append({
         'id': f"user-{g.current_user.id}",
@@ -252,18 +295,26 @@ def get_leaderboard():
         'is_current_user': True,
         'total_solved': user_solved,
         'best_rating': max(user_ratings) if user_ratings else 0,
-        'leetcode_solved': next((p.get('solved', 0) for p in user_profiles if p.get('platform') == 'LeetCode'), 0),
-        'codeforces_rating': next((p.get('rating', 0) for p in user_profiles if p.get('platform') == 'Codeforces'), 0),
-        'codechef_rating': next((p.get('rating', 0) for p in user_profiles if p.get('platform') == 'CodeChef'), 0),
-        'github_stars': next((p.get('total_stars', 0) for p in user_profiles if p.get('platform') == 'GitHub'), 0),
+        'leetcode_solved': get_stat(user_profiles, 'LeetCode', 'solved'),
+        'codeforces_rating': get_stat(user_profiles, 'Codeforces', 'rating'),
+        'codechef_rating': get_stat(user_profiles, 'CodeChef', 'rating'),
+        'github_stars': get_stat(user_profiles, 'GitHub', 'total_stars'),
     })
 
     # Friends
     friends = Friend.query.filter_by(user_id=g.current_user.id).all()
     for f in friends:
         f_profiles = aggregate_profiles(f.get_handles(), force_refresh=False)
-        f_solved = sum(p.get('solved', 0) for p in f_profiles if isinstance(p.get('solved'), int))
-        f_ratings = [p.get('rating') for p in f_profiles if isinstance(p.get('rating'), (int, float)) and p.get('rating')]
+        f_solved = sum(
+            extract_metric(p, 'solved', 0)
+            for p in f_profiles
+            if p.get('platform') in ['LeetCode', 'CodeChef', 'GFG']
+        )
+        f_ratings = [
+            extract_metric(p, 'rating')
+            for p in f_profiles
+            if isinstance(extract_metric(p, 'rating'), (int, float)) and extract_metric(p, 'rating') > 0
+        ]
 
         entries.append({
             'id': f"friend-{f.id}",
@@ -271,10 +322,10 @@ def get_leaderboard():
             'is_current_user': False,
             'total_solved': f_solved,
             'best_rating': max(f_ratings) if f_ratings else 0,
-            'leetcode_solved': next((p.get('solved', 0) for p in f_profiles if p.get('platform') == 'LeetCode'), 0),
-            'codeforces_rating': next((p.get('rating', 0) for p in f_profiles if p.get('platform') == 'Codeforces'), 0),
-            'codechef_rating': next((p.get('rating', 0) for p in f_profiles if p.get('platform') == 'CodeChef'), 0),
-            'github_stars': next((p.get('total_stars', 0) for p in f_profiles if p.get('platform') == 'GitHub'), 0),
+            'leetcode_solved': get_stat(f_profiles, 'LeetCode', 'solved'),
+            'codeforces_rating': get_stat(f_profiles, 'Codeforces', 'rating'),
+            'codechef_rating': get_stat(f_profiles, 'CodeChef', 'rating'),
+            'github_stars': get_stat(f_profiles, 'GitHub', 'total_stars'),
         })
 
     # Sort primarily by total problems solved, secondarily by best rating

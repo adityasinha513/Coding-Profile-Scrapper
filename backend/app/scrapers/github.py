@@ -3,11 +3,25 @@ import requests
 def fetch_github_profile(username: str) -> dict:
     """
     Fetches real-time GitHub profile data using the official GitHub REST API.
-    Retrieves public repos, total stars across repos, followers, and bio.
+    Retrieves public repos, total stars across repos, followers, following, and bio.
+    Returns:
+        {
+            "username": str,
+            "platform": "GitHub",
+            "available": bool,
+            "stats": dict or None,
+            "error": str or None
+        }
     """
-    username = username.strip()
+    username = (username or "").strip()
     if not username:
-        return {"platform": "GitHub", "error": "Username cannot be empty"}
+        return {
+            "username": "",
+            "platform": "GitHub",
+            "available": False,
+            "stats": None,
+            "error": "Username cannot be empty"
+        }
 
     headers = {
         "Accept": "application/vnd.github.v3+json",
@@ -20,14 +34,18 @@ def fetch_github_profile(username: str) -> dict:
 
         if user_resp.status_code == 404:
             return {
-                "platform": "GitHub",
                 "username": username,
+                "platform": "GitHub",
+                "available": False,
+                "stats": None,
                 "error": f"GitHub user '{username}' not found"
             }
         elif user_resp.status_code != 200:
             return {
-                "platform": "GitHub",
                 "username": username,
+                "platform": "GitHub",
+                "available": False,
+                "stats": None,
                 "error": f"GitHub API error (status {user_resp.status_code})"
             }
 
@@ -45,23 +63,28 @@ def fetch_github_profile(username: str) -> dict:
             pass
 
         return {
-            "platform": "GitHub",
             "username": username,
-            "name": user_data.get("name") or username,
-            "avatar": user_data.get("avatar_url") or "",
-            "bio": user_data.get("bio") or "",
-            "public_repos": user_data.get("public_repos", 0),
-            "total_stars": total_stars,
-            "followers": user_data.get("followers", 0),
-            "following": user_data.get("following", 0),
-            "profile_url": user_data.get("html_url") or f"https://github.com/{username}",
-            "created_at": user_data.get("created_at"),
+            "platform": "GitHub",
+            "available": True,
+            "stats": {
+                "name": user_data.get("name") or username,
+                "avatar": user_data.get("avatar_url") or "",
+                "bio": user_data.get("bio") or "",
+                "public_repos": user_data.get("public_repos", 0),
+                "total_stars": total_stars,
+                "followers": user_data.get("followers", 0),
+                "following": user_data.get("following", 0),
+                "profile_url": user_data.get("html_url") or f"https://github.com/{username}",
+                "created_at": user_data.get("created_at"),
+            },
             "error": None
         }
 
     except requests.RequestException as e:
         return {
-            "platform": "GitHub",
             "username": username,
-            "error": f"Network error fetching GitHub profile: {str(e)}"
+            "platform": "GitHub",
+            "available": False,
+            "stats": None,
+            "error": f"Network error connecting to GitHub: {str(e)}"
         }

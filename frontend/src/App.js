@@ -1,252 +1,158 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { Box, Typography, Link, useMediaQuery } from '@mui/material';
-import CssBaseline from '@mui/material/CssBaseline';
+import { Box, Typography, Link, CssBaseline } from '@mui/material';
 import Navbar from './components/Navbar';
-import Login from './pages/Login/loginpage';
-import Profile from './pages/Profile/profile';
-import LeetCode from './pages/LeetCode/leetcode';
-import CodeChef from './pages/CodeChef/codechef';
-import GFG from './pages/GFG/gfg';
-import GitHub from './pages/GitHub/github';
+import EditHandlesModal from './components/EditHandlesModal';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import LeaderboardPage from './pages/LeaderboardPage';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
-const lightTheme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-    background: {
-      default: '#f5f5f5',
-      paper: '#ffffff',
-    },
-  },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h1: {
-      fontSize: '2.5rem',
-      '@media (max-width:600px)': {
-        fontSize: '2rem',
+const getCustomTheme = (isDark) =>
+  createTheme({
+    palette: {
+      mode: isDark ? 'dark' : 'light',
+      primary: {
+        main: '#3b82f6',
+      },
+      secondary: {
+        main: '#8b5cf6',
+      },
+      background: {
+        default: isDark ? '#0b1120' : '#f8fafc',
+        paper: isDark ? '#1e293b' : '#ffffff',
+      },
+      text: {
+        primary: isDark ? '#f8fafc' : '#0f172a',
+        secondary: isDark ? '#94a3b8' : '#64748b',
       },
     },
-    h2: {
-      fontSize: '2rem',
-      '@media (max-width:600px)': {
-        fontSize: '1.75rem',
-      },
+    typography: {
+      fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      h4: { fontWeight: 800 },
+      h5: { fontWeight: 700 },
+      h6: { fontWeight: 700 },
     },
-    h3: {
-      fontSize: '1.75rem',
-      '@media (max-width:600px)': {
-        fontSize: '1.5rem',
-      },
+    shape: {
+      borderRadius: 12,
     },
-  },
-  components: {
-    MuiContainer: {
-      styleOverrides: {
-        root: {
-          paddingLeft: {
-            xs: 2,
-            sm: 3,
-            md: 4,
-          },
-          paddingRight: {
-            xs: 2,
-            sm: 3,
-            md: 4,
+    components: {
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            textTransform: 'none',
+            fontWeight: 600,
           },
         },
       },
     },
-  },
-});
-
-const darkTheme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: {
-      main: '#90caf9',
-    },
-    secondary: {
-      main: '#f48fb1',
-    },
-    background: {
-      default: '#121212',
-      paper: '#1e1e1e',
-    },
-  },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h1: {
-      fontSize: '2.5rem',
-      '@media (max-width:600px)': {
-        fontSize: '2rem',
-      },
-    },
-    h2: {
-      fontSize: '2rem',
-      '@media (max-width:600px)': {
-        fontSize: '1.75rem',
-      },
-    },
-    h3: {
-      fontSize: '1.75rem',
-      '@media (max-width:600px)': {
-        fontSize: '1.5rem',
-      },
-    },
-  },
-  components: {
-    MuiContainer: {
-      styleOverrides: {
-        root: {
-          paddingLeft: {
-            xs: 2,
-            sm: 3,
-            md: 4,
-          },
-          paddingRight: {
-            xs: 2,
-            sm: 3,
-            md: 4,
-          },
-        },
-      },
-    },
-  },
-});
+  });
 
 const ProtectedRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
-  if (!token) {
-    return <Navigate to="/login" />;
+  const { user, token, loading } = useAuth();
+
+  if (loading) return null;
+  if (!token && !user) {
+    return <Navigate to="/login" replace />;
   }
   return children;
 };
 
-function App() {
-  const [darkMode, setDarkMode] = useState(true);
-  const isMobile = useMediaQuery('(max-width:600px)');
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('darkMode');
-    if (savedTheme !== null) {
-      setDarkMode(JSON.parse(savedTheme));
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-  }, [darkMode]);
+function AppContent({ darkMode, setDarkMode }) {
+  const [openEditHandles, setOpenEditHandles] = useState(false);
 
   return (
-    <ThemeProvider theme={darkMode ? darkTheme : lightTheme}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <Navbar
+        darkMode={darkMode}
+        setDarkMode={setDarkMode}
+        onOpenEditHandles={() => setOpenEditHandles(true)}
+      />
+
+      <Box component="main" sx={{ flexGrow: 1 }}>
+        <Routes>
+          <Route path="/login" element={<Login darkMode={darkMode} />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard
+                  onOpenEditHandles={() => setOpenEditHandles(true)}
+                  darkMode={darkMode}
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/leaderboard"
+            element={
+              <ProtectedRoute>
+                <LeaderboardPage darkMode={darkMode} />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Box>
+
+      {/* Global Edit Handles Modal */}
+      <EditHandlesModal
+        open={openEditHandles}
+        onClose={() => setOpenEditHandles(false)}
+        darkMode={darkMode}
+      />
+
+      {/* Footer */}
+      <Box
+        component="footer"
+        sx={{
+          py: 3,
+          px: 2,
+          mt: 'auto',
+          borderTop: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)'}`,
+          backgroundColor: darkMode ? '#0b1120' : '#ffffff',
+          textAlign: 'center',
+        }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          © {new Date().getFullYear()}{' '}
+          <Link
+            href="https://github.com/adityasinha513"
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{ fontWeight: 600, color: '#3b82f6', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+          >
+            Aditya Sinha
+          </Link>{' '}
+          • Coding Profile Scrapper v1.0 • Built with Flask & React
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
+function App() {
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('themeMode');
+    return saved !== null ? saved === 'dark' : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('themeMode', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
+
+  const theme = getCustomTheme(darkMode);
+
+  return (
+    <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
-        <Box sx={{ 
-          display: 'flex', 
-          flexDirection: 'column',
-          minHeight: '100vh',
-          backgroundColor: 'background.default',
-        }}>
-          <Navbar darkMode={darkMode} setDarkMode={setDarkMode} />
-          <Box 
-            component="main" 
-            sx={{ 
-              flexGrow: 1,
-              py: isMobile ? 2 : 3,
-              px: isMobile ? 1 : 2,
-            }}
-          >
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route 
-                path="/profile" 
-                element={
-                  <ProtectedRoute>
-                    <Profile />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/leetcode" 
-                element={
-                  <ProtectedRoute>
-                    <LeetCode />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/codechef" 
-                element={
-                  <ProtectedRoute>
-                    <CodeChef />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/gfg" 
-                element={
-                  <ProtectedRoute>
-                    <GFG />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/github" 
-                element={
-                  <ProtectedRoute>
-                    <GitHub />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route path="/" element={<Navigate to="/profile" />} />
-            </Routes>
-          </Box>
-          <Box 
-            component="footer" 
-            sx={{ 
-              py: isMobile ? 2 : 3,
-              px: isMobile ? 1 : 2,
-              mt: 'auto',
-              backgroundColor: 'background.paper',
-              borderTop: 1,
-              borderColor: 'divider',
-            }}
-          >
-            <Typography 
-              variant="body2" 
-              color="text.secondary" 
-              align="center"
-              sx={{
-                fontSize: isMobile ? '0.875rem' : '1rem',
-              }}
-            >
-              {'© '}
-              {new Date().getFullYear()}
-              {' '}
-              <Link 
-                color="inherit" 
-                href="https://github.com/adityasinha513"
-                sx={{
-                  textDecoration: 'none',
-                  '&:hover': {
-                    textDecoration: 'underline',
-                  },
-                }}
-              >
-                Aditya Sinha
-              </Link>
-              {' - All rights reserved'}
-            </Typography>
-          </Box>
-        </Box>
-      </Router>
+      <AuthProvider>
+        <Router>
+          <AppContent darkMode={darkMode} setDarkMode={setDarkMode} />
+        </Router>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

@@ -9,10 +9,13 @@ load_dotenv()
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
 
+    os.makedirs(app.instance_path, exist_ok=True)
+    default_db_path = os.path.join(app.instance_path, 'coding_profiles.db')
+
     # Base configuration
     app.config.from_mapping(
         SECRET_KEY=os.getenv('SECRET_KEY', 'portfolio-v1-super-secret-key-2026'),
-        SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL', f"sqlite:///{os.path.join(app.root_path, 'coding_profiles.db')}"),
+        SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL', f"sqlite:///{default_db_path}"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
     )
 
