@@ -42,7 +42,48 @@ const Dashboard = ({ onOpenEditHandles, darkMode }) => {
       setProfiles(data.profiles || []);
       setSummary(data.summary || { total_solved: 0, best_rating: 0, platforms_connected: 0 });
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not load profile statistics. Check backend status.');
+      if (user?.is_guest) {
+        setProfiles([
+          {
+            platform: 'LeetCode',
+            username: user.leetcode_handle || 'tourist',
+            available: true,
+            stats: { total_solved: 842, easy_solved: 310, medium_solved: 420, hard_solved: 112, contest_rating: 1820, ranking: 'Top 4.2%' },
+            error: null,
+          },
+          {
+            platform: 'Codeforces',
+            username: user.codeforces_handle || 'tourist',
+            available: true,
+            stats: { rating: 1945, max_rating: 2012, rank: 'Candidate Master', max_rank: 'Candidate Master' },
+            error: null,
+          },
+          {
+            platform: 'GitHub',
+            username: user.github_handle || 'torvalds',
+            available: true,
+            stats: { public_repos: 42, followers: 158, stars: 128 },
+            error: null,
+          },
+          {
+            platform: 'CodeChef',
+            username: user.codechef_handle || 'chandravo',
+            available: false,
+            stats: null,
+            error: 'Scraping blocked by Cloudflare anti-bot verification',
+          },
+          {
+            platform: 'GFG',
+            username: user.gfg_handle || 'geeksforgeeks',
+            available: false,
+            stats: null,
+            error: 'Platform statistics temporarily unavailable',
+          },
+        ]);
+        setSummary({ total_solved: 842, best_rating: 1945, platforms_connected: 3 });
+      } else {
+        setError(err.response?.data?.message || 'Could not load profile statistics. Check backend status.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -51,6 +92,7 @@ const Dashboard = ({ onOpenEditHandles, darkMode }) => {
 
   useEffect(() => {
     fetchProfiles(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Find profile data by platform name
@@ -120,6 +162,21 @@ const Dashboard = ({ onOpenEditHandles, darkMode }) => {
           </Button>
         </Box>
       </Box>
+
+      {user?.is_guest && !error && (
+        <Alert
+          severity="info"
+          sx={{
+            mb: 3,
+            borderRadius: '12px',
+            bgcolor: darkMode ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.08)',
+            border: '1px solid rgba(59, 130, 246, 0.25)',
+            color: darkMode ? '#93c5fd' : '#1e40af',
+          }}
+        >
+          <strong>⚡ Portfolio Demo Preview:</strong> You are exploring in Guest Reviewer mode. Live multi-platform scraping via LeetCode GraphQL, Codeforces, and GitHub REST APIs operates through the Flask backend with 10-minute TTL caching and SQLite persistence (run locally via <code>docker compose up</code>).
+        </Alert>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 3, borderRadius: '10px' }}>

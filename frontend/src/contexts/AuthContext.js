@@ -14,13 +14,12 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const verifyUser = async () => {
       const storedToken = localStorage.getItem('token');
-      if (storedToken) {
+      if (storedToken && storedToken !== 'demo-guest-token') {
         try {
           const userData = await authAPI.getMe();
           setUser(userData);
           localStorage.setItem('user', JSON.stringify(userData));
         } catch (err) {
-          console.warn('Session verification failed, logging out');
           logout();
         }
       }
@@ -37,6 +36,25 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
     return data;
+  };
+
+  const loginAsGuestDemo = () => {
+    const demoGuest = {
+      id: 0,
+      name: 'Guest Reviewer',
+      email: 'demo@portfolio.com',
+      is_guest: true,
+      leetcode_handle: 'tourist',
+      github_handle: 'torvalds',
+      codeforces_handle: 'tourist',
+      codechef_handle: 'chandravo',
+      gfg_handle: 'geeksforgeeks',
+    };
+    setUser(demoGuest);
+    setToken('demo-guest-token');
+    localStorage.setItem('user', JSON.stringify(demoGuest));
+    localStorage.setItem('token', 'demo-guest-token');
+    return demoGuest;
   };
 
   const register = async (userData) => {
@@ -61,7 +79,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider
+      value={{ user, token, loading, login, loginAsGuestDemo, register, logout, updateUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

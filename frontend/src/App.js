@@ -149,7 +149,7 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <AuthProvider>
-        <Router>
+        <Router basename={process.env.PUBLIC_URL || '/'}>
           <AppContent darkMode={darkMode} setDarkMode={setDarkMode} />
         </Router>
       </AuthProvider>

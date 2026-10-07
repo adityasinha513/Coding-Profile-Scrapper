@@ -13,11 +13,13 @@ import {
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { leaderboardAPI, friendsAPI } from '../api/client';
+import { useAuth } from '../contexts/AuthContext';
 import LeaderboardTable from '../components/LeaderboardTable';
 import AddFriendModal from '../components/AddFriendModal';
 import HeadToHeadModal from '../components/HeadToHeadModal';
 
 const LeaderboardPage = ({ darkMode }) => {
+  const { user } = useAuth();
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -32,7 +34,57 @@ const LeaderboardPage = ({ darkMode }) => {
       const data = await leaderboardAPI.getLeaderboard();
       setLeaderboard(data);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load leaderboard data.');
+      if (user?.is_guest) {
+        setLeaderboard([
+          {
+            id: 1,
+            name: 'Aditya Sinha',
+            is_current_user: true,
+            leetcode_handle: 'adityasinha513',
+            codeforces_handle: 'tourist',
+            github_handle: 'adityasinha513',
+            codechef_handle: 'chandravo',
+            gfg_handle: 'adityasinha513',
+            total_solved: 842,
+            codeforces_rating: 1945,
+            github_stars: 128,
+            score: 984,
+            platforms_connected: 4,
+          },
+          {
+            id: 2,
+            name: 'Aarya Gupta',
+            is_current_user: false,
+            leetcode_handle: 'Aarya135',
+            codeforces_handle: 'petr',
+            github_handle: 'aaryaa135',
+            codechef_handle: 'aarya135',
+            gfg_handle: 'aaryagt7b',
+            total_solved: 780,
+            codeforces_rating: 1720,
+            github_stars: 45,
+            score: 865,
+            platforms_connected: 4,
+          },
+          {
+            id: 3,
+            name: 'Guest Reviewer',
+            is_current_user: false,
+            leetcode_handle: 'tourist',
+            codeforces_handle: 'tourist',
+            github_handle: 'torvalds',
+            codechef_handle: 'chandravo',
+            gfg_handle: 'geeksforgeeks',
+            total_solved: 650,
+            codeforces_rating: 1650,
+            github_stars: 32,
+            score: 720,
+            platforms_connected: 3,
+          },
+        ]);
+      } else {
+        setError(err.response?.data?.message || 'Failed to load leaderboard data.');
+      }
     } finally {
       setLoading(false);
     }
@@ -40,6 +92,7 @@ const LeaderboardPage = ({ darkMode }) => {
 
   useEffect(() => {
     fetchLeaderboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCompare = (friendRow) => {

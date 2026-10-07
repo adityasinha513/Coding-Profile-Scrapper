@@ -21,7 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const Login = ({ darkMode }) => {
   const navigate = useNavigate();
-  const { login, register } = useAuth();
+  const { login, register, loginAsGuestDemo } = useAuth();
   const [tab, setTab] = useState(0); // 0: Login, 1: Register
 
   // Form states
@@ -71,7 +71,9 @@ const Login = ({ darkMode }) => {
       await login('demo@portfolio.com', 'demo123');
       navigate('/dashboard');
     } catch (err) {
-      setError('Could not log into demo account. Please verify backend is running.');
+      // Graceful offline fallback for static GitHub Pages demo preview
+      loginAsGuestDemo();
+      navigate('/dashboard');
     } finally {
       setLoading(false);
     }
